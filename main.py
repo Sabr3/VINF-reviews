@@ -1,24 +1,10 @@
-import pandas as pd
+import os
 import time
 import re
 import constant
+import index
 import datetime
 from tqdm import tqdm
-
-
-def load_data():
-    df_raw = pd.read_json(constant.FILENAME)
-    return df_raw
-
-
-def optimize_df(dataframe):
-    dataframe = dataframe.drop('review_detail', axis=1)
-    dataframe.to_json("json_reviews.jl", orient="records", lines=True)
-
-
-def prepare_data():
-    df_raw = load_data()
-    optimize_df(df_raw)
 
 
 def let_user_pick(options):
@@ -145,7 +131,7 @@ def parse_single_reviewer_data(file, username):
     total_rating = 0
     no_rating_reviews = 0
 
-    for line in tqdm(file, total=100_000):
+    for line in file:
         reg = '\"reviewer\":\"' + username + '\"'
         try:
             found = re.search(reg, line)
@@ -155,7 +141,7 @@ def parse_single_reviewer_data(file, username):
                 reviewers_reliability += parse_reliability(line)
                 first_review_date = parse_first_review_date(line, first_review_date)
                 rating = parse_avg_rating(line)
-                if rating != -1:
+                if rating != -1 and rating is not None:
                     total_rating += rating
                 else:
                     no_rating_reviews += 1
@@ -172,7 +158,7 @@ def parse_single_reviewer_data(file, username):
         print('Reviewer\'s reliability:', reviewers_reliability)
 
 
-def parse_data(username):
+def parse_data_no_index(username):
     reviewer = None
     r_username = username
     with open("json_reviews.jl") as file:
@@ -191,15 +177,94 @@ def parse_data(username):
         parse_single_reviewer_data(file, reviewer)
 
 
-def main():
-    print('Enter reviewer\'s username:')
-    r_username = input()
+def parse_data_reviewer_index(files):
+    class File:
+        def __init__(self, name, length, username):
+            self.name = name
+            self.length = length
+            self.username = username
 
-    start = time.time()
-    prepare_data()
-    parse_data(r_username)
-    end = time.time()
-    print("Execution time in seconds: ", (end - start))
+    files_with_length = []
+    reviewers = []
+    # Let user pick which reviewer he wants, sorted by number of reviews
+    for file in files:
+        with open(file) as f:
+            for count, line in enumerate(f):
+                pass
+        file_with_stats = File(file, count + 1, file.replace('reviewer_index/', '').replace('.txt', ''))
+        files_with_length.append(file_with_stats)
+    files_with_length_sorted = sorted(files_with_length, key=lambda x: x.length, reverse=True)
+    for fwls in files_with_length_sorted:
+        reviewers.append(fwls.username)
+
+    reviewer = get_single_reviewer(reviewers)
+    reviewer_file = 'reviewer_index/{}.txt'.format(reviewer)
+    with open(reviewer_file) as file:
+        parse_single_reviewer_data(file, reviewer)
+
+
+def use_reviewer_index(username):
+    files = []
+    for file in os.listdir("reviewer_index"):
+        if bool(re.match(username, file, re.IGNORECASE)):
+            files.append(os.path.join("reviewer_index", file))
+    return files
+
+
+def get_query_type(query):
+    reg = r'reviewer:(\"|\')\w+(\"|\')'
+    try:
+        found = re.search(reg, query, re.IGNORECASE)
+        if found:
+            return 'REVIEWER'
+    except AttributeError:
+        pass
+    return 'ALL'
+
+
+def main():
+    print('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to do!')
+    options = ['Search for the query', 'Build index']
+    res = let_user_pick(options)
+
+    # If we're building index
+    if res == 1:
+        print('Which index do you want to build/rebuild?')
+        index_options = ['Reviewers index', 'All index']
+        index_res = let_user_pick(index_options)
+        if index_res == 0:
+            index.build_reviewer_index()
+        elif index_res == 1:
+            index.build_all_index()
+
+    elif res == 0:
+        print('Enter your search query:')
+        query = input()
+
+        query_type = get_query_type(query)
+        data = ''
+
+        # If QueryType is REVIEWER use ReviewerIndex
+        if query_type == 'REVIEWER':
+            # index = reviewer_index
+            query = query.replace('\'', '"')
+            username = query.split('"')[1]
+            start = time.time()
+            files = use_reviewer_index(username)
+            parse_data_reviewer_index(files)
+            end = time.time()
+            print("Execution time in seconds: ", (end - start))
+            return 0
+
+        # If QueryType is ALL use AllSearchIndex
+        elif query_type == 'ALL':
+            # index = all_index
+            print('All index')
+
+        start = time.time()
+        parse_data_no_index(query)
+        end = time.time()
+        print("Execution time in seconds: ", (end - start))
 
 
 if __name__ == '__main__':
