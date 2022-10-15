@@ -123,6 +123,16 @@ def parse_avg_rating(line):
         return -1
 
 
+def parse_review_id(line):
+    reg = '\"review_id\":\"\\w+\"'
+    try:
+        found = re.search(reg, line)
+        if found:
+            return found.group().split(':')[1].replace('\"', '')
+    except AttributeError:
+        return -1
+
+
 def parse_single_reviewer_data(file, username):
     reviewers_reliability = 0
     spoilers_count = 0
@@ -219,7 +229,58 @@ def get_query_type(query):
             return 'REVIEWER'
     except AttributeError:
         pass
-    return 'ALL'
+    return 'TF-IDF'
+
+
+def parse_reviews_by_id(review_ids):
+    result_reviews = []
+    with open('json_reviews.jl') as file:
+        for line in file:
+            review_id = parse_review_id(line)
+            if review_id in review_ids:
+                result_reviews.append(line)
+
+    return result_reviews
+
+
+def parse_reviewer(review):
+    reg = r'\"reviewer\":\"\w+\"'
+    try:
+        found = re.search(reg, review, re.IGNORECASE)
+        if found:
+            return found.group().split(':')[1].replace('"', '')
+    except AttributeError:
+        pass
+
+
+def parse_movie(review):
+    print(review)
+    reg = r'\"movie\":\"(\w|\W)+\"'
+    try:
+        found = re.search(reg, review, re.IGNORECASE)
+        if found:
+            return found.group().split('","rating":')[0].removeprefix('"movie":"')
+    except AttributeError:
+        pass
+
+
+def parse_reviewers_from_reviews(result_reviews):
+    reviews_details_list = []
+    for review in result_reviews:
+        reviewer = parse_reviewer(review)
+        movie = parse_movie(review)
+        review_detail = index.extract_review_detail(review)
+        reviews_details_list.append({'reviewer': reviewer, 'movie': movie, 'review_detail': review_detail})
+
+    return reviews_details_list
+
+
+def show_result_reviewers_and_extract_one(result_reviewers):
+    print('I found these reviews for your query. Please choose one from the list and I will show you data about the'
+          ' reviewer of that movie!')
+    res = let_user_pick(result_reviewers)
+    reviewer = result_reviewers[res]['reviewer']
+    return reviewer
 
 
 def main():
@@ -230,19 +291,18 @@ def main():
     # If we're building index
     if res == 1:
         print('Which index do you want to build/rebuild?')
-        index_options = ['Reviewers index', 'All index']
+        index_options = ['Reviewers index', 'TF-IDF index']
         index_res = let_user_pick(index_options)
         if index_res == 0:
             index.build_reviewer_index()
         elif index_res == 1:
-            index.build_all_index()
+            index.build_tf_idf_index()
 
     elif res == 0:
         print('Enter your search query:')
         query = input()
 
         query_type = get_query_type(query)
-        data = ''
 
         # If QueryType is REVIEWER use ReviewerIndex
         if query_type == 'REVIEWER':
@@ -257,14 +317,19 @@ def main():
             return 0
 
         # If QueryType is ALL use AllSearchIndex
-        elif query_type == 'ALL':
-            # index = all_index
-            print('All index')
+        elif query_type == 'TF-IDF':
+            review_ids = index.search_tf_idf_index(query)
+            result_reviews = parse_reviews_by_id(review_ids)
+            result_reviewers = parse_reviewers_from_reviews(result_reviews)
+            reviewer = show_result_reviewers_and_extract_one(result_reviewers)
+            # Put the result to reviewer index
+            files = use_reviewer_index(reviewer)
+            parse_data_reviewer_index(files)
 
-        start = time.time()
-        parse_data_no_index(query)
-        end = time.time()
-        print("Execution time in seconds: ", (end - start))
+        # start = time.time()
+        # parse_data_no_index(query)
+        # end = time.time()
+        # print("Execution time in seconds: ", (end - start))
 
 
 if __name__ == '__main__':
