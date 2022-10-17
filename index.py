@@ -11,6 +11,12 @@ from array import array
 from collections import defaultdict
 
 
+INDEX = {}
+TF = {}
+IDF = {}
+INDEX_LOADED = False
+
+
 def load_data():
     return pd.read_json(constant.FILENAME)
 
@@ -173,6 +179,14 @@ def read_tf_idf_index():
             idf[term] = float(idft)
 
     print('Index loaded\n')
+    global INDEX_LOADED
+    INDEX_LOADED = True
+    global INDEX
+    INDEX = index
+    global TF
+    TF = tf
+    global IDF
+    IDF = idf
     return index, tf, idf
 
 
@@ -240,5 +254,9 @@ def free_text_query(query, index, tf, idf):
 
 
 def search_tf_idf_index(query):
-    index, tf, idf = read_tf_idf_index()
+    if not INDEX_LOADED:
+        index, tf, idf = read_tf_idf_index()
+    index = INDEX
+    tf = TF
+    idf = IDF
     return free_text_query(query, index, tf, idf)

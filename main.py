@@ -222,7 +222,7 @@ def use_reviewer_index(username):
 
 
 def get_query_type(query):
-    reg = r'reviewer:(\"|\')\w+(\"|\')'
+    reg = "reviewer:(\"|\')\\w+(\"|\')"
     try:
         found = re.search(reg, query, re.IGNORECASE)
         if found:
@@ -285,52 +285,63 @@ def show_result_reviewers_and_extract_one(result_reviewers):
 
 def main():
     print('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to do!')
-    options = ['Search for the query', 'Build index']
+    options = ['Search for the query', 'Build index', 'Exit the program']
     res = let_user_pick(options)
 
-    # If we're building index
-    if res == 1:
-        print('Which index do you want to build/rebuild?')
-        index_options = ['Reviewers index', 'TF-IDF index']
-        index_res = let_user_pick(index_options)
-        if index_res == 0:
-            index.build_reviewer_index()
-        elif index_res == 1:
-            index.build_tf_idf_index()
+    while res != 2:
+        # If we're building index
+        if res == 1:
+            print('Which index do you want to build/rebuild?')
+            index_options = ['Reviewers index', 'TF-IDF index']
+            index_res = let_user_pick(index_options)
+            if index_res == 0:
+                index.build_reviewer_index()
+            elif index_res == 1:
+                index.build_tf_idf_index()
 
-    elif res == 0:
-        print('Enter your search query:')
-        query = input()
+        elif res == 0:
+            print('Enter your search query:')
+            query = input()
 
-        query_type = get_query_type(query)
+            query_type = get_query_type(query)
 
-        # If QueryType is REVIEWER use ReviewerIndex
-        if query_type == 'REVIEWER':
-            # index = reviewer_index
-            query = query.replace('\'', '"')
-            username = query.split('"')[1]
-            start = time.time()
-            files = use_reviewer_index(username)
-            parse_data_reviewer_index(files)
-            end = time.time()
-            print("Execution time in seconds: ", (end - start))
+            # If QueryType is REVIEWER use ReviewerIndex
+            if query_type == 'REVIEWER':
+                # index = reviewer_index
+                query = query.replace('\'', '"')
+                username = query.split('"')[1]
+                start = time.time()
+                files = use_reviewer_index(username)
+                parse_data_reviewer_index(files)
+                end = time.time()
+                print("Execution time in seconds: ", (end - start))
+
+            # If QueryType is ALL use AllSearchIndex
+            elif query_type == 'TF-IDF':
+                review_ids = index.search_tf_idf_index(query)
+                result_reviews = parse_reviews_by_id(review_ids)
+                result_reviewers = parse_reviewers_from_reviews(result_reviews)
+                reviewer = show_result_reviewers_and_extract_one(result_reviewers)
+                # Put the result to reviewer index
+                files = use_reviewer_index(reviewer)
+                parse_data_reviewer_index(files)
+
+        elif res == 2:
+            print('Bye Bye!')
             return 0
 
-        # If QueryType is ALL use AllSearchIndex
-        elif query_type == 'TF-IDF':
-            review_ids = index.search_tf_idf_index(query)
-            result_reviews = parse_reviews_by_id(review_ids)
-            result_reviewers = parse_reviewers_from_reviews(result_reviews)
-            reviewer = show_result_reviewers_and_extract_one(result_reviewers)
-            # Put the result to reviewer index
-            files = use_reviewer_index(reviewer)
-            parse_data_reviewer_index(files)
-
+        print('Please choose what you want to do next!')
+        options = ['Search for the query', 'Build index', 'Exit the program']
+        res = let_user_pick(options)
         # start = time.time()
         # parse_data_no_index(query)
         # end = time.time()
         # print("Execution time in seconds: ", (end - start))
 
+    print('Bye Bye!')
+
 
 if __name__ == '__main__':
     main()
+
+# TODO: clean the cases where user types ' in the query
