@@ -1,3 +1,4 @@
+import copy
 import math
 import re
 import os
@@ -208,12 +209,49 @@ def rank_documents(query_terms, docs, index_dict):
     return result_review_ids
 
 
-def free_text_query(query, index_dict):
+def phrase_query(query, index_dict):
+    print(colored('Looking for phrase: {}'.format(query), 'yellow'))
     query_terms = get_terms(query)
-    if len(query_terms) == 0:
-        print('Empty query!')
-        return []
 
+    doc_list_intersection = intersect_query_with_index(query_terms, index_dict)
+
+    doc_phrase_list = {}
+
+    for rw_id in doc_list_intersection:
+        doc_phrase_list[rw_id] = {}
+        for term in query_terms:
+            review_phrase = index_dict[term]['term_positions_list'][rw_id]
+            doc_phrase_list[rw_id][term] = review_phrase
+    phrase_match = {}
+
+    for idx, dpl in enumerate(doc_phrase_list):
+        phrase_match[dpl] = []
+        for i, term in enumerate(query_terms):
+            possible_matches = []
+            if i == 0:
+                continue
+            for j in range(len(doc_phrase_list[dpl][term])):
+                try:
+                    term_index_minus_one = doc_phrase_list[dpl][term][j] - 1
+                    list_index_minus_one = doc_phrase_list[dpl][query_terms[i-1]]
+                    if term_index_minus_one in list_index_minus_one:
+                        possible_matches.append(doc_phrase_list[dpl][term][j])
+                    doc_phrase_list[dpl][term] = possible_matches
+                except:
+                    pass
+            if possible_matches:
+                phrase_match[dpl] = phrase_match[dpl] + possible_matches
+
+    matched_review_ids = []
+
+    for dpl in phrase_match:
+        if len(phrase_match[dpl]) == len(query_terms) - 1:
+            matched_review_ids.append(dpl)
+
+    return rank_documents(query_terms, matched_review_ids, index_dict)
+
+
+def intersect_query_with_index(query_terms, index_dict):
     doc_list_intersection = set()
     for term in query_terms:
         if term in index_dict:
@@ -225,7 +263,16 @@ def free_text_query(query, index_dict):
             # Logical AND
             doc_list_intersection = doc_list_intersection & set(docs)
 
-    doc_list_intersection = list(doc_list_intersection)
+    return list(doc_list_intersection)
+
+
+def free_text_query(query, index_dict):
+    query_terms = get_terms(query)
+    if len(query_terms) == 0:
+        print('Empty query!')
+        return []
+
+    doc_list_intersection = intersect_query_with_index(query_terms, index_dict)
 
     if len(doc_list_intersection) == 0:
         return
@@ -233,8 +280,10 @@ def free_text_query(query, index_dict):
     return rank_documents(query_terms, doc_list_intersection, index_dict)
 
 
-def search_tf_idf_index(query):
+def search_tf_idf_index(query, is_phrase_query):
     if not INDEX_LOADED:
         read_tf_idf_index()
     index = INDEX
+    if is_phrase_query:
+        return phrase_query(query, index)
     return free_text_query(query, index)

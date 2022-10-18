@@ -171,7 +171,7 @@ def parse_single_reviewer_data(file, username):
         print(colored('Showing data for {}', 'green').format(username))
         print('Reviewer\'s total reviews', all_reviews_count)
         print('Reviewer\'s first review date:', reverse_parse_date(first_review_date))
-        print('Reviewer\'s spoiler rate: {:0.2f}%'.format(spoilers_count/all_reviews_count * 100))
+        print('Reviewer\'s spoiler rate: {:0.2f}%'.format(spoilers_count / all_reviews_count * 100))
         print('Reviewer\'s average rating: {:0.1f}/10'.format(total_rating / total_rated_reviews))
         print('Reviewer\'s reliability:', reviewers_reliability)
 
@@ -246,6 +246,12 @@ def get_query_type(query):
     except AttributeError:
         pass
     return 'TF-IDF'
+
+
+def is_phrase_query(query):
+    if (query.startswith('"') and query.endswith('"')) or (query.startswith("'") and query.endswith("'")):
+        return True
+    return False
 
 
 def parse_reviews_by_id(review_ids):
@@ -340,7 +346,8 @@ def main():
             elif query_type == 'TF-IDF':
                 if not index.INDEX_LOADED:
                     print('Reading index to memory. Please wait ...')
-                review_ids = index.search_tf_idf_index(query)
+                is_phrase = is_phrase_query(query)
+                review_ids = index.search_tf_idf_index(query, is_phrase)
                 result_reviews = parse_reviews_by_id(review_ids)
                 result_reviewers = parse_reviewers_from_reviews(result_reviews)
                 reviewer = show_result_reviewers_and_extract_one(result_reviewers)
@@ -363,5 +370,4 @@ def main():
 if __name__ == '__main__':
     main()
 
-# TODO: clean the cases where user types ' or string in the query, clean no results for query
 # TODO: Phrase Query
