@@ -262,7 +262,7 @@ def parse_reviews_by_id(review_ids):
 
 
 def parse_reviewer(review):
-    reg = r'\"reviewer\":\"\w+\"'
+    reg = r'\"reviewer\":\"(\w|[^\w"])+\"'
     try:
         found = re.search(reg, review, re.IGNORECASE)
         if found:
