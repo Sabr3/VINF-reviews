@@ -20,4 +20,7 @@ stopwords_set = set(stopwords.words('english'))  # Added movie because I guess i
 stopwords_set.add('movie')
 STOPWORDS = stopwords_set
 
+TEST_FILE = 'tf_test.dat'
 INDEX_FILE = 'tf_idf_index.dat'
+TEST_JSON = 'sample-short.json'
+JSON_LINES = 'json_reviews.jl'

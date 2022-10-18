@@ -7,8 +7,9 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 import constant
-from array import array
+import json
 from collections import defaultdict
+from termcolor import colored
 
 
 INDEX = {}
@@ -22,8 +23,7 @@ def load_data():
 
 
 def optimize_df(dataframe):
-    # dataframe = dataframe.drop('review_detail', axis=1)
-    dataframe.to_json("json_reviews.jl", orient="records", lines=True)
+    dataframe.to_json(constant.JSON_LINES, orient="records", lines=True)
 
 
 def prepare_data():
@@ -39,7 +39,7 @@ def build_reviewer_index():
 
     path_to_index = constant.DIRECTORY + '/reviewer_index/'
 
-    with open("json_reviews.jl") as file:
+    with open(constant.JSON_LINES) as file:
         print('Building Reviewer Index')
         # Go through the lines and sort reviewers with all their reviews alphabetically
         for line in tqdm(file, total=100_000):
@@ -57,12 +57,12 @@ def build_reviewer_index():
 
 def get_terms(doc):
     doc = doc.lower()
-    doc = re.sub(r'\\W', ' ', doc)  # put spaces instead of non-alphanumeric characters
+    doc = re.sub(r'\W', ' ', doc)  # put spaces instead of non-alphanumeric characters
     terms = doc.split()
 
     terms = [term for term in terms if term not in constant.STOPWORDS]
     terms = [constant.LEMMATIZER.lemmatize(term) for term in terms]
-    terms = [constant.STEMMER.stem(term) for term in terms]
+    # terms = [constant.STEMMER.stem(term) for term in terms]
     return terms
 
 
@@ -87,20 +87,21 @@ def extract_review_detail(line):
 
 
 def write_tf_idf_index_to_file(index, docs_count, tf, df):
-    with open(constant.INDEX_FILE, 'w') as file:
-        docs_count = int(docs_count)
-        print('docs_count:{}'.format(docs_count), file=file)  # Print to file
+    index_dict = {}
+    for term in index.keys():
+        term_positions_list = {}
+        for term_position in index[term]:
+            doc_id = term_position[0]  # review_id aka doc_id
+            positions = term_position[1].tolist()  # positions of the term in the document
+            term_positions_list[doc_id] = positions
 
-        for term in index.keys():
-            term_positions_list = []
-            for term_position in index[term]:
-                doc_id = term_position[0]  # review_id aka doc_id
-                positions = term_position[1]  # positions of the term in the document
-                term_positions_list.append(':'.join([str(doc_id), ','.join(map(str, positions))]))
-            term_positions_data = ';'.join(term_positions_list)
-            tf_data = ','.join(map(str, tf[term]))
-            idf_data = '%4f' % (1 + np.log(docs_count / df[term]))
-            print('|'.join((term, term_positions_data, tf_data, idf_data)), end="\n", file=file)
+        idf = '%4f' % (1 + np.log(docs_count / df[term]))
+        index_dict[term] = {'term_positions_list': term_positions_list, 'tf': tf[term], 'idf': idf}
+
+    with open(constant.INDEX_FILE, 'w') as file:
+        # docs_count = int(docs_count)
+        # print('docs_count:{}'.format(docs_count), file=file)  # Print to file
+        file.write(json.dumps(index_dict))
 
 
 def build_tf_idf_index():
@@ -113,12 +114,15 @@ def build_tf_idf_index():
     tf = defaultdict(list)  # term frequencies of terms in documents
     df = defaultdict(int)  # document frequencies of terms in the corpus
 
-    with open('json_reviews.jl', 'r', encoding='latin-1') as file:
+    with open(constant.JSON_LINES, 'r', encoding='latin-1') as file:
 
         for idx, line in tqdm(enumerate(file), total=100_000):
             doc_id = extract_review_id(line)  # Here take review ID as document ID
-            review_detail = extract_review_detail(line)
-            terms = get_terms(review_detail)
+
+            # review_detail = extract_review_detail(line)
+            # terms = get_terms(review_detail)
+            review_details = line.replace('"', '').replace("'", "")
+            terms = get_terms(review_details)
 
             if terms is None:
                 continue
@@ -153,43 +157,19 @@ def build_tf_idf_index():
 
 
 def read_tf_idf_index():
-    index = {}
-    tf = {}
-    idf = {}
-
     with open(constant.INDEX_FILE) as file:
-        docs_count = int(file.readline().rstrip().removeprefix('docs_count:'))
+        # docs_count = int(file.readline().rstrip().removeprefix('docs_count:'))
+        data = file.read()
+        index_dict = json.loads(data)
 
-        for line in tqdm(file, total=100_000):
-            line = line.rstrip()
-            term, term_positions, tfl, idft = line.split(
-                '|')
-            term_positions = term_positions.split(';')  # term_positions = ['doc_id1:pos1,pos2','doc_id2:pos1,pos2']
-            term_positions_parsed = []
-            for t in term_positions:
-                t = t.split(":")  # term_positions = [['doc_id1', 'pos1,pos2'], ['doc_id2', 'pos1,pos2']]
-                term_positions_parsed.append([t[0], map(int, t[1].split(','))])  # term_positions = [['doc_id1',
-                # [pos1,pos2], ['doc_id2', [pos1,pos2]]]
-
-            index[term] = term_positions_parsed
-            # read tf
-            tfl = tfl.split(',')
-            tf[term] = tfl  # map(float, tfl)
-            # read idf
-            idf[term] = float(idft)
-
-    print('Index loaded\n')
+    print(colored('Index loaded\n', 'green'))
     global INDEX_LOADED
     INDEX_LOADED = True
     global INDEX
-    INDEX = index
-    global TF
-    TF = tf
-    global IDF
-    IDF = idf
-    return index, tf, idf
+    INDEX = index_dict
 
 
+# Euclidean normalization
 def dot_product(vec1, vec2):
     if len(vec1) != len(vec2):
         return 0
@@ -203,30 +183,32 @@ def parse_review_ids(result_docs):
     return review_ids
 
 
-def rank_documents(query_terms, docs, index, tf, idf):
+def rank_documents(query_terms, docs, index_dict):
+    # Preparation of variables
     doc_vectors = defaultdict(lambda: [0] * len(query_terms))
-    query_vector = [0] * len(query_terms)
+    query_vector = [0] * len(query_terms)  # Query will have [0, 0, 0, 0] (if query length is 4)
 
     for term_index, term in enumerate(query_terms):
-        query_vector[term_index] = idf[term]
-        for docIndex, (doc, postings) in enumerate(index[term]):
-            if doc in docs:
-                tfScores = list(tf[term])
-                doc_vectors[doc][term_index] = float(tfScores[docIndex])
+        idf = index_dict[term]['idf']
+        tf = index_dict[term]['tf']
+        query_vector[term_index] = float(idf)  # Assign to positions of query_vector the idf value of the term
+        for docIndex, doc_id in enumerate(index_dict[term]['term_positions_list'].keys()):
+            if doc_id in docs:
+                tfScores = tf
+                doc_vectors[doc_id][term_index] = float(tfScores[docIndex])  # Assign to doc_vectors the termIndexes
+                # tfScores
 
-    print(query_vector)
     doc_scores = [[doc, dot_product(doc_vector, query_vector), doc_vector, query_vector] for doc, doc_vector in
-                  doc_vectors.items()]
+                  doc_vectors.items()]  # Doc_scores
 
     doc_scores.sort(key=lambda x: x[1], reverse=True)  # sort by dot_product
-    result_docs = [d for d in doc_scores][:10]  # Max number of results
-    print(result_docs)
+    result_docs = [d for d in doc_scores][:10]  # Max number of results is 10
     result_review_ids = parse_review_ids(result_docs)
 
     return result_review_ids
 
 
-def free_text_query(query, index, tf, idf):
+def free_text_query(query, index_dict):
     query_terms = get_terms(query)
     if len(query_terms) == 0:
         print('Empty query!')
@@ -234,10 +216,9 @@ def free_text_query(query, index, tf, idf):
 
     doc_list_intersection = set()
     for term in query_terms:
-        print('Looking for ' + term)
-        if term in index:
-            term_positions = index[term]
-            docs = [t[0] for t in term_positions]
+        if term in index_dict:
+            term_positions = index_dict[term]['term_positions_list']
+            docs = list(term_positions.keys())
             # If doc_list_intersection is empty initialize it, so that there's intersection
             if not doc_list_intersection:
                 doc_list_intersection = set(docs)
@@ -247,16 +228,13 @@ def free_text_query(query, index, tf, idf):
     doc_list_intersection = list(doc_list_intersection)
 
     if len(doc_list_intersection) == 0:
-        print('No results for the specified query!')
         return
 
-    return rank_documents(query_terms, doc_list_intersection, index, tf, idf)
+    return rank_documents(query_terms, doc_list_intersection, index_dict)
 
 
 def search_tf_idf_index(query):
     if not INDEX_LOADED:
-        index, tf, idf = read_tf_idf_index()
+        read_tf_idf_index()
     index = INDEX
-    tf = TF
-    idf = IDF
-    return free_text_query(query, index, tf, idf)
+    return free_text_query(query, index)

@@ -1,10 +1,12 @@
 import os
-import time
 import re
 import constant
 import index
 import datetime
 from tqdm import tqdm
+from termcolor import colored
+import cProfile
+import pstats
 
 
 def let_user_pick(options):
@@ -158,36 +160,46 @@ def parse_single_reviewer_data(file, username):
         except AttributeError:
             pass
 
+    total_rated_reviews = all_reviews_count - no_rating_reviews
+    if total_rated_reviews == 0:
+        total_rated_reviews = 1
+        total_rating = 5
+
     if all_reviews_count == 0:
-        print('Reviewer has not posted any review yet!')
+        print(colored('Reviewer has not posted any review yet!', 'red'))
     else:
+        print(colored('Showing data for {}', 'green').format(username))
         print('Reviewer\'s total reviews', all_reviews_count)
         print('Reviewer\'s first review date:', reverse_parse_date(first_review_date))
         print('Reviewer\'s spoiler rate: {:0.2f}%'.format(spoilers_count/all_reviews_count * 100))
-        print('Reviewer\'s average rating: {:0.1f}/10'.format(total_rating/(all_reviews_count-no_rating_reviews)))
+        print('Reviewer\'s average rating: {:0.1f}/10'.format(total_rating / total_rated_reviews))
         print('Reviewer\'s reliability:', reviewers_reliability)
 
 
-def parse_data_no_index(username):
-    reviewer = None
-    r_username = username
-    with open("json_reviews.jl") as file:
-        if reviewer is None:
-            reviewers = list(parse_usernames(file, r_username))
-            reviewer = get_single_reviewer(reviewers)
-        while reviewer is None:
-            print('No results found! Try again!')
-            file.seek(0)  # Return to beginning
-            r_username = input()
-            reviewers = list(parse_usernames(file, r_username))
-            reviewer = get_single_reviewer(reviewers)
-
-        file.seek(0)
-        print("Showing results for reviewer", reviewer)
-        parse_single_reviewer_data(file, reviewer)
+# def parse_data_no_index(username):
+#     reviewer = None
+#     r_username = username
+#     with open("json_reviews.jl") as file:
+#         if reviewer is None:
+#             reviewers = list(parse_usernames(file, r_username))
+#             reviewer = get_single_reviewer(reviewers)
+#         while reviewer is None:
+#             print('No results found! Try again!')
+#             file.seek(0)  # Return to beginning
+#             r_username = input()
+#             reviewers = list(parse_usernames(file, r_username))
+#             reviewer = get_single_reviewer(reviewers)
+#
+#         file.seek(0)
+#         print("Showing results for reviewer", reviewer)
+#         parse_single_reviewer_data(file, reviewer)
 
 
 def parse_data_reviewer_index(files):
+    if not files:
+        print(colored('No results found for that query! Please try again!', 'red'))
+        return
+
     class File:
         def __init__(self, name, length, username):
             self.name = name
@@ -214,6 +226,8 @@ def parse_data_reviewer_index(files):
 
 
 def use_reviewer_index(username):
+    if not username:
+        return
     files = []
     for file in os.listdir("reviewer_index"):
         if bool(re.match(username, file, re.IGNORECASE)):
@@ -223,6 +237,8 @@ def use_reviewer_index(username):
 
 def get_query_type(query):
     reg = "reviewer:(\"|\')\\w+(\"|\')"
+    # Just so that we find out that user wanted to search for the reviewer
+    query = query.replace(' ', '')
     try:
         found = re.search(reg, query, re.IGNORECASE)
         if found:
@@ -233,6 +249,8 @@ def get_query_type(query):
 
 
 def parse_reviews_by_id(review_ids):
+    if not review_ids:
+        return
     result_reviews = []
     with open('json_reviews.jl') as file:
         for line in file:
@@ -254,7 +272,6 @@ def parse_reviewer(review):
 
 
 def parse_movie(review):
-    print(review)
     reg = r'\"movie\":\"(\w|\W)+\"'
     try:
         found = re.search(reg, review, re.IGNORECASE)
@@ -265,6 +282,8 @@ def parse_movie(review):
 
 
 def parse_reviewers_from_reviews(result_reviews):
+    if not result_reviews:
+        return
     reviews_details_list = []
     for review in result_reviews:
         reviewer = parse_reviewer(review)
@@ -276,15 +295,18 @@ def parse_reviewers_from_reviews(result_reviews):
 
 
 def show_result_reviewers_and_extract_one(result_reviewers):
-    print('I found these reviews for your query. Please choose one from the list and I will show you data about the'
-          ' reviewer of that movie!')
+    if not result_reviewers:
+        return
+    print(colored('I found these reviews for your query. Please choose one from the list and I will show you '
+                  'data about the reviewer of that movie!', 'green'))
     res = let_user_pick(result_reviewers)
     reviewer = result_reviewers[res]['reviewer']
     return reviewer
 
 
 def main():
-    print('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to do!')
+    print(colored('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to '
+                  'do!', 'blue'))
     options = ['Search for the query', 'Build index', 'Exit the program']
     res = let_user_pick(options)
 
@@ -296,6 +318,7 @@ def main():
             index_res = let_user_pick(index_options)
             if index_res == 0:
                 index.build_reviewer_index()
+
             elif index_res == 1:
                 index.build_tf_idf_index()
 
@@ -310,14 +333,13 @@ def main():
                 # index = reviewer_index
                 query = query.replace('\'', '"')
                 username = query.split('"')[1]
-                start = time.time()
                 files = use_reviewer_index(username)
                 parse_data_reviewer_index(files)
-                end = time.time()
-                print("Execution time in seconds: ", (end - start))
 
             # If QueryType is ALL use AllSearchIndex
             elif query_type == 'TF-IDF':
+                if not index.INDEX_LOADED:
+                    print('Reading index to memory. Please wait ...')
                 review_ids = index.search_tf_idf_index(query)
                 result_reviews = parse_reviews_by_id(review_ids)
                 result_reviewers = parse_reviewers_from_reviews(result_reviews)
@@ -330,18 +352,16 @@ def main():
             print('Bye Bye!')
             return 0
 
+        print('-------------------------------------------------------------------------------------------------------')
         print('Please choose what you want to do next!')
         options = ['Search for the query', 'Build index', 'Exit the program']
         res = let_user_pick(options)
-        # start = time.time()
-        # parse_data_no_index(query)
-        # end = time.time()
-        # print("Execution time in seconds: ", (end - start))
 
-    print('Bye Bye!')
+    print(colored('Bye Bye!', 'blue'))
 
 
 if __name__ == '__main__':
     main()
 
-# TODO: clean the cases where user types ' in the query
+# TODO: clean the cases where user types ' or string in the query, clean no results for query
+# TODO: Phrase Query
