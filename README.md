@@ -1,4 +1,4 @@
-====== Lukáš Líška (lukas.liska) - Private Space ======
+# Lukáš Líška (lukas.liska) - Private Space
 
 **Téma projektu**: O21 - Vytvorenie jednoduchej služby, ktorá po zadaní mena filmového kritika, užívateľovi zobrazí štatistiku kritikových reviews (aj s filmami, ktoré reviewoval) s jednoduchým pomerom reliability a inými špecifickými informáciami (Python, Framework?).
 
