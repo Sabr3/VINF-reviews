@@ -245,7 +245,7 @@ def phrase_query(query, index_dict):
     matched_review_ids = []
 
     for dpl in phrase_match:
-        if len(phrase_match[dpl]) == len(query_terms) - 1:
+        if len(phrase_match[dpl]) >= len(query_terms) - 1:
             matched_review_ids.append(dpl)
 
     return rank_documents(query_terms, matched_review_ids, index_dict)
