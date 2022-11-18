@@ -23,4 +23,4 @@ STOPWORDS = stopwords_set
 TEST_FILE = 'tf_test.dat'
 INDEX_FILE = 'tf_idf_index.dat'
 TEST_JSON = 'sample-short.json'
-JSON_LINES = 'json_reviews.jl'
+JSON_LINES_FILE = 'final_data.jl'

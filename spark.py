@@ -35,9 +35,11 @@ def parse_data(filename):
     df2 = df2.withColumnRenamed('review_detail', 'review')
 
     # Movie release year add column and remove year
-    df2 = df2.withColumn("movie_release_year", substring("movie", -5, 4))
+    df2 = df2.withColumn("movie_release_year", when(col('movie').contains('\u2013'), substring("movie", -7, 5)).otherwise(
+        substring("movie", -5, 4)))
     df2 = df2.withColumn("movie", expr('replace(movie, coalesce(movie_release_year, ""), "")'))
     df2 = df2.withColumn("movie", expr('replace(movie, " ()", "")'))
+    df2 = df2.withColumn("movie", expr('replace(movie, " ( )", "")'))
 
     # Transform date to date format from string
     df2 = df2.withColumn("review_date",

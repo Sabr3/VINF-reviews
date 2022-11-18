@@ -49,22 +49,22 @@ def parse_usernames(file, username):
 
 
 def parse_reliability(line):
-    reg = '\"helpful\":\\[\"\\d+\",\"\\d+\"\\]'
+    reg = '\"helpful\":-?\\d+'
     try:
         found = re.search(reg, line)
         if found:
             # Extract numbers from helpful tag
-            numbers = re.findall(r'\d+', found.group())
-            return int(numbers[0]) - int(numbers[1])
+            numbers = re.findall(r'-?\d+', found.group())
+            return int(numbers[0])
     except AttributeError:
         pass
 
 
 def parse_spoiler_count(line):
-    reg = '\"spoiler_tag\":1'
+    reg = '\"spoiler\":1'
     try:
-        spoiler_tag = re.search(reg, line)
-        return 1 if bool(spoiler_tag) else 0
+        is_spoiler = bool(re.search(reg, line))
+        return 1 if is_spoiler else 0
     except AttributeError:
         pass
 
@@ -77,36 +77,35 @@ def get_earlier_date(date1, date2):
     d2 = datetime.datetime(int(d2[0]), int(d2[1]), int(d2[2]))
     return date1 if d1 < d2 else date2
 
-
-# Parse date to machine-readable form
-def parse_date(date):
-    date = date.split(' ')
-    year = date[2]
-    month = {i for i in constant.MONTH_DICT if constant.MONTH_DICT[i] == date[1]}.pop()
-    day = date[0]
-    date = '{0}/{1}/{2}'.format(year, month, day)
-    return date
+#
+# # Parse date to machine-readable form
+# def parse_date(date):
+#     date = date.split(' ')
+#     year = date[2]
+#     month = {i for i in constant.MONTH_DICT if constant.MONTH_DICT[i] == date[1]}.pop()
+#     day = date[0]
+#     date = '{0}/{1}/{2}'.format(year, month, day)
+#     return date
 
 
 # Parse date to human-readable form
 def reverse_parse_date(date):
-    date = date.split('/')
-    year = date[0]
+    date = date.split('-')
+    day = date[0]
     month = constant.MONTH_DICT[int(date[1])]
-    day = date[2]
+    year = date[2]
     date = '{0} {1} {2}'.format(day, month, year)
     return date
 
 
 def parse_first_review_date(line, review_date):
     found_review_date = review_date
-    reg = '\"review_date\":\"\\d+\\s\\w+\\s\\d+\"'
+    reg = '\"review_date\":\"\\d+-\\d+-\\d+\"'
     try:
         found = re.search(reg, line)
         if found:
             # date in dd MM yyyy format
-            raw_date = found.group().split(':')[1].replace('"', '')
-            found_review_date = parse_date(raw_date)
+            found_review_date = found.group().split(':')[1].replace('"', '')
     except AttributeError:
         pass
     if not review_date:
@@ -116,11 +115,11 @@ def parse_first_review_date(line, review_date):
 
 
 def parse_avg_rating(line):
-    reg = '\"rating\":\\d+\\.*\\d*'
+    reg = '\"rating\":\"\\d+\\.*\\d*\"'
     try:
         found = re.search(reg, line)
         if found:
-            return float(found.group().split(':')[1].replace('\'', ''))
+            return float(found.group().split(':')[1].replace('\"', ''))
     except AttributeError:
         return -1
 
@@ -141,7 +140,6 @@ def parse_single_reviewer_data(file, username):
     all_reviews_count = 0
     first_review_date = False
     total_rating = 0
-    no_rating_reviews = 0
 
     for line in file:
         reg = '\"reviewer\":\"' + username + '\"'
@@ -155,15 +153,9 @@ def parse_single_reviewer_data(file, username):
                 rating = parse_avg_rating(line)
                 if rating != -1 and rating is not None:
                     total_rating += rating
-                else:
-                    no_rating_reviews += 1
+
         except AttributeError:
             pass
-
-    total_rated_reviews = all_reviews_count - no_rating_reviews
-    if total_rated_reviews == 0:
-        total_rated_reviews = 1
-        total_rating = 5
 
     if all_reviews_count == 0:
         print(colored('Reviewer has not posted any review yet!', 'red'))
@@ -172,7 +164,7 @@ def parse_single_reviewer_data(file, username):
         print('Reviewer\'s total reviews', all_reviews_count)
         print('Reviewer\'s first review date:', reverse_parse_date(first_review_date))
         print('Reviewer\'s spoiler rate: {:0.2f}%'.format(spoilers_count / all_reviews_count * 100))
-        print('Reviewer\'s average rating: {:0.1f}/10'.format(total_rating / total_rated_reviews))
+        print('Reviewer\'s average rating: {:0.1f}/10'.format(total_rating / all_reviews_count))
         print('Reviewer\'s reliability:', reviewers_reliability)
 
 

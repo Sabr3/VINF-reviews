@@ -4,7 +4,6 @@ import os
 import shutil
 from numpy import dot
 from tqdm import tqdm
-import pandas as pd
 import numpy as np
 import constant
 import json
@@ -18,31 +17,17 @@ IDF = {}
 INDEX_LOADED = False
 
 
-def load_data():
-    return pd.read_json(constant.FILENAME)
-
-
-def optimize_df(dataframe):
-    dataframe.to_json(constant.JSON_LINES, orient="records", lines=True)
-
-
-def prepare_data():
-    df_raw = load_data()
-    optimize_df(df_raw)
-
-
 def build_reviewer_index():
-    prepare_data()
     # Reset the directory
     shutil.rmtree(constant.DIRECTORY + '/reviewer_index', ignore_errors=False, onerror=None)
     os.mkdir(constant.DIRECTORY + '/reviewer_index')
 
     path_to_index = constant.DIRECTORY + '/reviewer_index/'
 
-    with open(constant.JSON_LINES) as file:
+    with open(constant.JSON_LINES_FILE) as file:
         print('Building Reviewer Index')
         # Go through the lines and sort reviewers with all their reviews alphabetically
-        for line in tqdm(file, total=100_000):
+        for line in tqdm(file, total=5_500_000):
             reg = '\"reviewer\":\"\\w+\"'
             try:
                 found = re.search(reg, line)
@@ -107,16 +92,14 @@ def write_tf_idf_index_to_file(index, docs_count, tf, df):
 def build_tf_idf_index():
     print('Building TF-IDF Index')
 
-    prepare_data()
-
     docs_count = 0
     index = defaultdict(list)  # the inverted index
     tf = defaultdict(list)  # term frequencies of terms in documents
     df = defaultdict(int)  # document frequencies of terms in the corpus
 
-    with open(constant.JSON_LINES, 'r', encoding='latin-1') as file:
+    with open(constant.JSON_LINES_FILE, 'r', encoding='latin-1') as file:
 
-        for idx, line in tqdm(enumerate(file), total=100_000):
+        for idx, line in tqdm(enumerate(file), total=5_571_000):
             doc_id = extract_review_id(line)  # Here take review ID as document ID
 
             # review_detail = extract_review_detail(line)
