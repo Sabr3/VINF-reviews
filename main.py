@@ -3,10 +3,8 @@ import re
 import constant
 import index
 import datetime
-from tqdm import tqdm
-from termcolor import colored
-import cProfile
-import pstats
+# from tqdm import tqdm
+# from termcolor import colored
 
 
 def let_user_pick(options):
@@ -36,7 +34,7 @@ def get_single_reviewer(reviewers):
 def parse_usernames(file, username):
     reviewers = set()
 
-    for line in tqdm(file, total=100_000):
+    for line in file:
         reg = r'\"reviewer\":\"' + username + '\\w*\"'
         try:
             found = re.search(reg, line, re.IGNORECASE)
@@ -49,22 +47,22 @@ def parse_usernames(file, username):
 
 
 def parse_reliability(line):
-    reg = '\"helpful\":\\[\"\\d+\",\"\\d+\"\\]'
+    reg = '\"helpful\":-?\\d+'
     try:
         found = re.search(reg, line)
         if found:
             # Extract numbers from helpful tag
-            numbers = re.findall(r'\d+', found.group())
-            return int(numbers[0]) - int(numbers[1])
+            numbers = re.findall(r'-?\d+', found.group())
+            return int(numbers[0])
     except AttributeError:
         pass
 
 
 def parse_spoiler_count(line):
-    reg = '\"spoiler_tag\":1'
+    reg = '\"spoiler\":1'
     try:
-        spoiler_tag = re.search(reg, line)
-        return 1 if bool(spoiler_tag) else 0
+        is_spoiler = bool(re.search(reg, line))
+        return 1 if is_spoiler else 0
     except AttributeError:
         pass
 
@@ -77,36 +75,35 @@ def get_earlier_date(date1, date2):
     d2 = datetime.datetime(int(d2[0]), int(d2[1]), int(d2[2]))
     return date1 if d1 < d2 else date2
 
-
-# Parse date to machine-readable form
-def parse_date(date):
-    date = date.split(' ')
-    year = date[2]
-    month = {i for i in constant.MONTH_DICT if constant.MONTH_DICT[i] == date[1]}.pop()
-    day = date[0]
-    date = '{0}/{1}/{2}'.format(year, month, day)
-    return date
+#
+# # Parse date to machine-readable form
+# def parse_date(date):
+#     date = date.split(' ')
+#     year = date[2]
+#     month = {i for i in constant.MONTH_DICT if constant.MONTH_DICT[i] == date[1]}.pop()
+#     day = date[0]
+#     date = '{0}/{1}/{2}'.format(year, month, day)
+#     return date
 
 
 # Parse date to human-readable form
 def reverse_parse_date(date):
-    date = date.split('/')
-    year = date[0]
+    date = date.split('-')
+    day = date[0]
     month = constant.MONTH_DICT[int(date[1])]
-    day = date[2]
+    year = date[2]
     date = '{0} {1} {2}'.format(day, month, year)
     return date
 
 
 def parse_first_review_date(line, review_date):
     found_review_date = review_date
-    reg = '\"review_date\":\"\\d+\\s\\w+\\s\\d+\"'
+    reg = '\"review_date\":\"\\d+-\\d+-\\d+\"'
     try:
         found = re.search(reg, line)
         if found:
             # date in dd MM yyyy format
-            raw_date = found.group().split(':')[1].replace('"', '')
-            found_review_date = parse_date(raw_date)
+            found_review_date = found.group().split(':')[1].replace('"', '')
     except AttributeError:
         pass
     if not review_date:
@@ -116,11 +113,11 @@ def parse_first_review_date(line, review_date):
 
 
 def parse_avg_rating(line):
-    reg = '\"rating\":\\d+\\.*\\d*'
+    reg = '\"rating\":\"\\d+\\.*\\d*\"'
     try:
         found = re.search(reg, line)
         if found:
-            return float(found.group().split(':')[1].replace('\'', ''))
+            return float(found.group().split(':')[1].replace('\"', ''))
     except AttributeError:
         return -1
 
@@ -141,7 +138,6 @@ def parse_single_reviewer_data(file, username):
     all_reviews_count = 0
     first_review_date = False
     total_rating = 0
-    no_rating_reviews = 0
 
     for line in file:
         reg = '\"reviewer\":\"' + username + '\"'
@@ -155,24 +151,20 @@ def parse_single_reviewer_data(file, username):
                 rating = parse_avg_rating(line)
                 if rating != -1 and rating is not None:
                     total_rating += rating
-                else:
-                    no_rating_reviews += 1
+
         except AttributeError:
             pass
 
-    total_rated_reviews = all_reviews_count - no_rating_reviews
-    if total_rated_reviews == 0:
-        total_rated_reviews = 1
-        total_rating = 5
-
     if all_reviews_count == 0:
-        print(colored('Reviewer has not posted any review yet!', 'red'))
+        # print(colored('Reviewer has not posted any review yet!', 'red'))
+        print('Reviewer has not posted any review yet!')
     else:
-        print(colored('Showing data for {}', 'green').format(username))
+        # print(colored('Showing data for {}', 'green').format(username))
+        print('Showing data for {}'.format(username))
         print('Reviewer\'s total reviews', all_reviews_count)
         print('Reviewer\'s first review date:', reverse_parse_date(first_review_date))
         print('Reviewer\'s spoiler rate: {:0.2f}%'.format(spoilers_count / all_reviews_count * 100))
-        print('Reviewer\'s average rating: {:0.1f}/10'.format(total_rating / total_rated_reviews))
+        print('Reviewer\'s average rating: {:0.1f}/10'.format(total_rating / all_reviews_count))
         print('Reviewer\'s reliability:', reviewers_reliability)
 
 
@@ -197,7 +189,8 @@ def parse_single_reviewer_data(file, username):
 
 def parse_data_reviewer_index(files):
     if not files:
-        print(colored('No results found for that query! Please try again!', 'red'))
+        # print(colored('No results found for that query! Please try again!', 'red'))
+        print('No results found for that query! Please try again!')
         return
 
     class File:
@@ -245,7 +238,7 @@ def get_query_type(query):
             return 'REVIEWER'
     except AttributeError:
         pass
-    return 'TF-IDF'
+    return 'FULL-TEXT'
 
 
 def is_phrase_query(query):
@@ -287,6 +280,16 @@ def parse_movie(review):
         pass
 
 
+def extract_review_detail(line):
+    reg = '\"review_detail\":\"(\\w|\\W)+\"'
+    try:
+        found = re.search(reg, line)
+        if found:
+            return found.group().removeprefix('"review_detail":"').split('","helpful":')[0]
+    except AttributeError:
+        return -1
+
+
 def parse_reviewers_from_reviews(result_reviews):
     if not result_reviews:
         return
@@ -294,7 +297,7 @@ def parse_reviewers_from_reviews(result_reviews):
     for review in result_reviews:
         reviewer = parse_reviewer(review)
         movie = parse_movie(review)
-        review_detail = index.extract_review_detail(review)
+        review_detail = extract_review_detail(review)
         reviews_details_list.append({'reviewer': reviewer, 'movie': movie, 'review_detail': review_detail})
 
     return reviews_details_list
@@ -303,16 +306,19 @@ def parse_reviewers_from_reviews(result_reviews):
 def show_result_reviewers_and_extract_one(result_reviewers):
     if not result_reviewers:
         return
-    print(colored('I found these reviews for your query. Please choose one from the list and I will show you '
-                  'data about the reviewer of that movie!', 'green'))
+    # print(colored('I found these reviews for your query. Please choose one from the list and I will show you '
+    #               'data about the reviewer of that movie!', 'green'))
+    print('I found these reviews for your query. Please choose one from the list and I will show you '
+          'data about the reviewer of that movie!')
     res = let_user_pick(result_reviewers)
     reviewer = result_reviewers[res]['reviewer']
     return reviewer
 
 
 def main():
-    print(colored('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to '
-                  'do!', 'blue'))
+    # print(colored('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to '
+    #               'do!', 'blue'))
+    print('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to do!')
     options = ['Search for the query', 'Build index', 'Exit the program']
     res = let_user_pick(options)
 
@@ -320,13 +326,15 @@ def main():
         # If we're building index
         if res == 1:
             print('Which index do you want to build/rebuild?')
-            index_options = ['Reviewers index', 'TF-IDF index']
+            # index_options = ['Reviewers index', 'TF-IDF index']
+            index_options = ['Reviewers index', 'PyLucene Index']
             index_res = let_user_pick(index_options)
             if index_res == 0:
                 index.build_reviewer_index()
 
             elif index_res == 1:
-                index.build_tf_idf_index()
+                # index.build_tf_idf_index()
+                index.build_pylucene_index()
 
         elif res == 0:
             print('Enter your search query:')
@@ -343,17 +351,18 @@ def main():
                 parse_data_reviewer_index(files)
 
             # If QueryType is ALL use AllSearchIndex
-            elif query_type == 'TF-IDF':
-                if not index.INDEX_LOADED:
-                    print('Reading index to memory. Please wait ...')
-                is_phrase = is_phrase_query(query)
-                review_ids = index.search_tf_idf_index(query, is_phrase)
-                result_reviews = parse_reviews_by_id(review_ids)
-                result_reviewers = parse_reviewers_from_reviews(result_reviews)
-                reviewer = show_result_reviewers_and_extract_one(result_reviewers)
+            elif query_type == 'FULL-TEXT':
+                index.search_pylucene_index(query)
+                #if not index.INDEX_LOADED:
+                #    print('Reading index to memory. Please wait ...')
+                #is_phrase = is_phrase_query(query)
+                #review_ids = index.search_tf_idf_index(query, is_phrase)
+                #result_reviews = parse_reviews_by_id(review_ids)
+                #result_reviewers = parse_reviewers_from_reviews(result_reviews)
+                #reviewer = show_result_reviewers_and_extract_one(result_reviewers)
                 # Put the result to reviewer index
-                files = use_reviewer_index(reviewer)
-                parse_data_reviewer_index(files)
+                #files = use_reviewer_index(reviewer)
+                #parse_data_reviewer_index(files)
 
         elif res == 2:
             print('Bye Bye!')
@@ -364,7 +373,8 @@ def main():
         options = ['Search for the query', 'Build index', 'Exit the program']
         res = let_user_pick(options)
 
-    print(colored('Bye Bye!', 'blue'))
+    # print(colored('Bye Bye!', 'blue'))
+    print('Bye Bye!')
 
 
 if __name__ == '__main__':
