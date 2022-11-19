@@ -4,7 +4,7 @@ import constant
 import index
 import datetime
 # from tqdm import tqdm
-# from termcolor import colored
+from termcolor import colored
 
 
 def let_user_pick(options):
@@ -69,10 +69,10 @@ def parse_spoiler_count(line):
 
 def get_earlier_date(date1, date2):
     # date in yyyy/mm/dd format
-    d1 = date1.split('/')
-    d1 = datetime.datetime(int(d1[0]), int(d1[1]), int(d1[2]))
-    d2 = date2.split('/')
-    d2 = datetime.datetime(int(d2[0]), int(d2[1]), int(d2[2]))
+    d1 = date1.split('-')
+    d1 = datetime.datetime(day=int(d1[0]), month=int(d1[1]), year=int(d1[2]))
+    d2 = date2.split('-')
+    d2 = datetime.datetime(day=int(d2[0]), month=int(d2[1]), year=int(d2[2]))
     return date1 if d1 < d2 else date2
 
 #
@@ -122,16 +122,6 @@ def parse_avg_rating(line):
         return -1
 
 
-def parse_review_id(line):
-    reg = '\"review_id\":\"\\w+\"'
-    try:
-        found = re.search(reg, line)
-        if found:
-            return found.group().split(':')[1].replace('\"', '')
-    except AttributeError:
-        return -1
-
-
 def parse_single_reviewer_data(file, username):
     reviewers_reliability = 0
     spoilers_count = 0
@@ -156,11 +146,9 @@ def parse_single_reviewer_data(file, username):
             pass
 
     if all_reviews_count == 0:
-        # print(colored('Reviewer has not posted any review yet!', 'red'))
-        print('Reviewer has not posted any review yet!')
+        print(colored('Reviewer has not posted any review yet!', 'red'))
     else:
-        # print(colored('Showing data for {}', 'green').format(username))
-        print('Showing data for {}'.format(username))
+        print(colored('Showing data for {}', 'green').format(username))
         print('Reviewer\'s total reviews', all_reviews_count)
         print('Reviewer\'s first review date:', reverse_parse_date(first_review_date))
         print('Reviewer\'s spoiler rate: {:0.2f}%'.format(spoilers_count / all_reviews_count * 100))
@@ -168,29 +156,9 @@ def parse_single_reviewer_data(file, username):
         print('Reviewer\'s reliability:', reviewers_reliability)
 
 
-# def parse_data_no_index(username):
-#     reviewer = None
-#     r_username = username
-#     with open("json_reviews.jl") as file:
-#         if reviewer is None:
-#             reviewers = list(parse_usernames(file, r_username))
-#             reviewer = get_single_reviewer(reviewers)
-#         while reviewer is None:
-#             print('No results found! Try again!')
-#             file.seek(0)  # Return to beginning
-#             r_username = input()
-#             reviewers = list(parse_usernames(file, r_username))
-#             reviewer = get_single_reviewer(reviewers)
-#
-#         file.seek(0)
-#         print("Showing results for reviewer", reviewer)
-#         parse_single_reviewer_data(file, reviewer)
-
-
 def parse_data_reviewer_index(files):
     if not files:
-        # print(colored('No results found for that query! Please try again!', 'red'))
-        print('No results found for that query! Please try again!')
+        print(colored('No results found for that query! Please try again!', 'red'))
         return
 
     class File:
@@ -240,30 +208,18 @@ def get_query_type(query):
         pass
     return 'FULL-TEXT'
 
-
-def is_phrase_query(query):
-    if (query.startswith('"') and query.endswith('"')) or (query.startswith("'") and query.endswith("'")):
-        return True
-    return False
-
-
-def parse_reviews_by_id(review_ids):
-    if not review_ids:
-        return
-    result_reviews = []
-    with open('json_reviews.jl') as file:
-        for line in file:
-            review_id = parse_review_id(line)
-            if review_id in review_ids:
-                result_reviews.append(line)
-
-    return result_reviews
+#
+# def is_phrase_query(query):
+#     if (query.startswith('"') and query.endswith('"')) or (query.startswith("'") and query.endswith("'")):
+#         return True
+#     return False
 
 
 def parse_reviewer(review):
     reg = r'\"reviewer\":\"(\w|[^\w"])+\"'
     try:
         found = re.search(reg, review, re.IGNORECASE)
+        print(found)
         if found:
             return found.group().split(':')[1].replace('"', '')
     except AttributeError:
@@ -275,17 +231,17 @@ def parse_movie(review):
     try:
         found = re.search(reg, review, re.IGNORECASE)
         if found:
-            return found.group().split('","rating":')[0].removeprefix('"movie":"')
+            return found.group().split('","rating":')[0].replace('"movie":"', '')
     except AttributeError:
         pass
 
 
 def extract_review_detail(line):
-    reg = '\"review_detail\":\"(\\w|\\W)+\"'
+    reg = '\"review\":\"(\\w|\\W)+\"'
     try:
         found = re.search(reg, line)
         if found:
-            return found.group().removeprefix('"review_detail":"').split('","helpful":')[0]
+            return found.group().split('","helpful":')[0].replace('"review":"', '')
     except AttributeError:
         return -1
 
@@ -295,6 +251,7 @@ def parse_reviewers_from_reviews(result_reviews):
         return
     reviews_details_list = []
     for review in result_reviews:
+        print('REVIEW:', review)
         reviewer = parse_reviewer(review)
         movie = parse_movie(review)
         review_detail = extract_review_detail(review)
@@ -306,19 +263,16 @@ def parse_reviewers_from_reviews(result_reviews):
 def show_result_reviewers_and_extract_one(result_reviewers):
     if not result_reviewers:
         return
-    # print(colored('I found these reviews for your query. Please choose one from the list and I will show you '
-    #               'data about the reviewer of that movie!', 'green'))
-    print('I found these reviews for your query. Please choose one from the list and I will show you '
-          'data about the reviewer of that movie!')
+    print(colored('I found these reviews for your query. Please choose one from the list and I will show you '
+                  'data about the reviewer of that movie!', 'green'))
     res = let_user_pick(result_reviewers)
     reviewer = result_reviewers[res]['reviewer']
     return reviewer
 
 
 def main():
-    # print(colored('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to '
-    #               'do!', 'blue'))
-    print('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to do!')
+    print(colored('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to '
+                  'do!', 'blue'))
     options = ['Search for the query', 'Build index', 'Exit the program']
     res = let_user_pick(options)
 
@@ -352,17 +306,16 @@ def main():
 
             # If QueryType is ALL use AllSearchIndex
             elif query_type == 'FULL-TEXT':
-                index.search_pylucene_index(query)
-                #if not index.INDEX_LOADED:
-                #    print('Reading index to memory. Please wait ...')
+                result_reviews = index.search_pylucene_index(query)
+                print(result_reviews)
                 #is_phrase = is_phrase_query(query)
                 #review_ids = index.search_tf_idf_index(query, is_phrase)
                 #result_reviews = parse_reviews_by_id(review_ids)
-                #result_reviewers = parse_reviewers_from_reviews(result_reviews)
-                #reviewer = show_result_reviewers_and_extract_one(result_reviewers)
+                result_reviewers = parse_reviewers_from_reviews(result_reviews)
+                reviewer = show_result_reviewers_and_extract_one(result_reviewers)
                 # Put the result to reviewer index
-                #files = use_reviewer_index(reviewer)
-                #parse_data_reviewer_index(files)
+                files = use_reviewer_index(reviewer)
+                parse_data_reviewer_index(files)
 
         elif res == 2:
             print('Bye Bye!')

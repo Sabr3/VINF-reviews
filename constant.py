@@ -1,18 +1,4 @@
 import os
-# import nltk
-# from nltk.corpus import stopwords
-# from nltk.stem import PorterStemmer
-# from nltk.stem import WordNetLemmatizer
-#
-# nltk.download('stopwords')
-# nltk.download('wordnet')
-# nltk.download('omw-1.4')
-
-# STEMMER = PorterStemmer()
-# LEMMATIZER = WordNetLemmatizer()
-# stopwords_set = set(stopwords.words('english'))  # Added movie because I guess it's a stopword in my context
-# stopwords_set.add('movie')
-# STOPWORDS = stopwords_set
 
 FILENAME = 'sample.json'
 MONTH_DICT = {1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
@@ -23,4 +9,4 @@ DIRECTORY = os.getcwd()
 TEST_FILE = 'tf_test.dat'
 INDEX_FILE = 'tf_idf_index.dat'
 TEST_JSON = 'sample-short.json'
-JSON_LINES_FILE = 'json_reviews.jl'
+JSON_LINES_FILE = 'final_data.jl'
