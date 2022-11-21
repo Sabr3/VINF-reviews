@@ -25,8 +25,8 @@ def build_reviewer_index():
     with open(constant.JSON_LINES_FILE) as file:
         print('Building Reviewer Index')
         # Go through the lines and sort reviewers with all their reviews alphabetically
-        for line in file:
-            reg = '\"reviewer\":\"\\w+\"'
+        for line in tqdm(file, total=5_500_000):
+            reg = r'\"reviewer\":\"(\w|-|\s)+\"'
             try:
                 found = re.search(reg, line)
                 if found:
