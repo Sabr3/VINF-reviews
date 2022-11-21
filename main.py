@@ -149,7 +149,7 @@ def parse_single_reviewer_data(file, username):
         print(colored('Reviewer has not posted any review yet!', 'red'))
     else:
         print(colored('Showing data for {}', 'green').format(username))
-        print('Reviewer\'s total reviews', all_reviews_count)
+        print('Reviewer\'s total reviews:', all_reviews_count)
         print('Reviewer\'s first review date:', reverse_parse_date(first_review_date))
         print('Reviewer\'s spoiler rate: {:0.2f}%'.format(spoilers_count / all_reviews_count * 100))
         print('Reviewer\'s average rating: {:0.1f}/10'.format(total_rating / all_reviews_count))
@@ -219,7 +219,6 @@ def parse_reviewer(review):
     reg = r'\"reviewer\":\"(\w|[^\w"])+\"'
     try:
         found = re.search(reg, review, re.IGNORECASE)
-        print(found)
         if found:
             return found.group().split(':')[1].replace('"', '')
     except AttributeError:
@@ -251,7 +250,6 @@ def parse_reviewers_from_reviews(result_reviews):
         return
     reviews_details_list = []
     for review in result_reviews:
-        print('REVIEW:', review)
         reviewer = parse_reviewer(review)
         movie = parse_movie(review)
         review_detail = extract_review_detail(review)
@@ -307,10 +305,6 @@ def main():
             # If QueryType is ALL use AllSearchIndex
             elif query_type == 'FULL-TEXT':
                 result_reviews = index.search_pylucene_index(query)
-                print(result_reviews)
-                #is_phrase = is_phrase_query(query)
-                #review_ids = index.search_tf_idf_index(query, is_phrase)
-                #result_reviews = parse_reviews_by_id(review_ids)
                 result_reviewers = parse_reviewers_from_reviews(result_reviews)
                 reviewer = show_result_reviewers_and_extract_one(result_reviewers)
                 # Put the result to reviewer index
