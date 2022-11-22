@@ -3,7 +3,6 @@ import re
 import constant
 import index
 import datetime
-# from tqdm import tqdm
 from termcolor import colored
 
 
@@ -74,16 +73,6 @@ def get_earlier_date(date1, date2):
     d2 = date2.split('-')
     d2 = datetime.datetime(day=int(d2[0]), month=int(d2[1]), year=int(d2[2]))
     return date1 if d1 < d2 else date2
-
-#
-# # Parse date to machine-readable form
-# def parse_date(date):
-#     date = date.split(' ')
-#     year = date[2]
-#     month = {i for i in constant.MONTH_DICT if constant.MONTH_DICT[i] == date[1]}.pop()
-#     day = date[0]
-#     date = '{0}/{1}/{2}'.format(year, month, day)
-#     return date
 
 
 # Parse date to human-readable form
@@ -207,12 +196,6 @@ def get_query_type(query):
     except AttributeError:
         pass
     return 'FULL-TEXT'
-
-#
-# def is_phrase_query(query):
-#     if (query.startswith('"') and query.endswith('"')) or (query.startswith("'") and query.endswith("'")):
-#         return True
-#     return False
 
 
 def parse_reviewer(review):
