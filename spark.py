@@ -29,6 +29,9 @@ def parse_data(filename):
     # Replace "/" in reviewer's name to "|" to fix the problem with slashes in filenames
     df2 = df2.withColumn("reviewer", expr('replace(reviewer, "/", "|")'))
 
+    # Parse space in usernames to indexable fields (to "__")
+    df2 = df2.withColumn("reviewer", expr('replace(reviewer, " ", "__")'))
+
     # When rating null - put 5.0 as a default value
     df2 = df2.withColumn('rating', when(col('rating').isNull(), 5).otherwise(col('rating')))
 
