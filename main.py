@@ -11,7 +11,7 @@ def let_user_pick(options):
     for idx, element in enumerate(options):
         print("{}) {}".format(idx + 1, element))
 
-    i = input("Enter number: ")
+    i = input(colored("Pick a number from the list above: ", "yellow"))
     while True:
         if 0 < int(i) <= len(options):
             return int(i) - 1
@@ -148,7 +148,7 @@ def parse_single_reviewer_data(file, username):
     if all_reviews_count == 0:
         print(colored('Reviewer has not posted any review yet!', 'red'))
     else:
-        print(colored('Showing data for {}', 'green').format(username))
+        print(colored('Showing data about: {}', 'green').format(username))
         print('Reviewer\'s total reviews:', all_reviews_count)
         print('Reviewer\'s first review date:', reverse_parse_date(first_review_date))
         print('Reviewer\'s spoiler rate: {:0.2f}%'.format(spoilers_count / all_reviews_count * 100))
@@ -272,7 +272,12 @@ def main():
     print(colored('Welcome to FoxSearch (Collection of IMDb reviews from many years). Please choose what you want to '
                   'do!', 'blue'))
     options = ['Search for the query', 'Build index', 'Exit the program']
-    res = let_user_pick(options)
+    try:
+        res = let_user_pick(options)
+    except:
+        print(colored('Wrong number. Please try again!', 'red'))
+        res = -1
+        pass
 
     while res != 2:
         # If we're building index
@@ -315,13 +320,18 @@ def main():
             print('Bye Bye!')
             return 0
 
-        print('-------------------------------------------------------------------------------------------------------')
+        print(colored('-------------------------------------------------------------------------------------------------------', 'green'))
+        print(colored('-------------------------------------------------------------------------------------------------------', 'green'))
         print('Please choose what you want to do next!')
         options = ['Search for the query', 'Build index', 'Exit the program']
-        res = let_user_pick(options)
+        try:
+            res = let_user_pick(options)
+        except:
+            print(colored('Wrong number. Please try again!', 'red'))
+            res = -1
+            continue
 
-    # print(colored('Bye Bye!', 'blue'))
-    print('Bye Bye!')
+    print(colored('Bye Bye!', 'blue'))
 
 
 if __name__ == '__main__':
