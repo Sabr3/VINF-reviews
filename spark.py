@@ -26,6 +26,9 @@ def parse_data(filename):
     # Reliability summer
     df2 = df.withColumn("helpful", col("helpful")[0] - col("helpful")[1])
 
+    # Replace "/" in reviewer's name to "\"
+    df2 = df2.withColumn("reviewer", expr('replace(reviewer, "/", "|")'))
+
     # When rating null - put 5.0 as a default value
     df2 = df2.withColumn('rating', when(col('rating').isNull(), 5).otherwise(col('rating')))
 
@@ -79,7 +82,7 @@ def parse_data(filename):
     print(filename + ": " + str(cnt) + " rows")
 
 
-# MultiThreading
+# MultiThreading - If needed change the thread count to lower number
 pool = ThreadPool(8)
 pool.map(parse_data, json_file_list)
 
